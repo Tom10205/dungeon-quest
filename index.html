@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#111827"><title>Dungeon Quest</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111827;color:#f3f4f6;font:16px system-ui;touch-action:none}
+main{max-width:620px;margin:auto;padding:12px}.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:22px;margin:4px 0 10px}.panel{background:#1f2937;border:1px solid #374151;border-radius:14px;padding:12px;margin:10px 0}
+button,select{background:#374151;color:white;border:1px solid #64748b;border-radius:10px;padding:11px;font-size:15px}
+button:active{background:#2563eb}.primary{background:#2563eb}.danger{background:#991b1b}
+canvas{width:100%;height:auto;display:block;background:#20372a;border-radius:10px;image-rendering:pixelated}
+.stats{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.controls{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.pad{width:156px;height:156px;border-radius:50%;background:#263449;border:2px solid #64748b;position:relative;touch-action:none}
+.knob{position:absolute;width:62px;height:62px;left:45px;top:45px;border-radius:50%;background:#3b82f6;border:3px solid #bfdbfe;pointer-events:none}
+.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;flex:1}.small{font-size:13px;color:#cbd5e1}
+#choose{display:flex;flex-wrap:wrap;gap:7px}#choose button{flex:1;min-width:42%}.hidden{display:none}
+</style></head>
+<body><main>
+<div class="top"><h1>⚔️ DUNGEON QUEST</h1><span id="levelTag">Этаж 1</span></div>
+<section class="panel" id="selection"><b>Выбери героя</b><div id="choose"></div><p class="small">Каждый герой имеет свои характеристики.</p><button class="primary" id="start">Начать приключение</button></section>
+<section class="panel"><div class="stats"><b id="heroName">Воин</b><span id="hp">❤️ 16/16</span><span id="gold">🪙 0</span><span id="damage">⚔️ 4</span></div><canvas id="game" width="420" height="420"></canvas><p class="small" id="status">Выбери героя и начни игру.</p></section>
+<section class="panel"><div class="controls">
+<div><div class="small">Движение</div><div class="pad" id="movePad"><div class="knob" id="moveKnob"></div></div></div>
+<div class="actions"><button id="attack" class="danger">⚔️ Атака</button><button id="skill" class="primary">✨ Способность</button><button id="heal">❤️ Лечение (8🪙)</button><button id="upgrade">⬆️ Меч (10🪙)</button><button id="armor">🛡 Броня (15🪙)</button><button id="next">Следующий этаж</button></div>
+</div><p class="small">Удерживай палец на левом джойстике для движения. Кнопки справа — действия.</p></section>
+</main>
+<script>
+const cvs=document.querySelector('#game'),ctx=cvs.getContext('2d');
+const heroes=[{name:'Воин',hp:16,atk:4,color:'#b94a3c',hair:'#38251e',skill:'Мощный удар'},{name:'Лучник',hp:12,atk:3,color:'#328d50',hair:'#593825',skill:'Тройной выстрел'},{name:'Маг',hp:10,atk:5,color:'#7955c9',hair:'#d8d9e8',skill:'Огненный шар'},{name:'Ассасин',hp:11,atk:4,color:'#343a51',hair:'#24212c',skill:'Теневой удар'}];
+let hero=0,started=false,player={x:1,y:1},enemy={x:4,y:3,hp:10,max:10},level=1,gold=+(localStorage.dqGold||0),upgrade=0,armor=0,hp=16,rooms=0,tiles=[],skillReady=true;
+const $=s=>document.querySelector(s);
+heroes.forEach((h,i)=>{let b=document.createElement('button');b.textContent=`${h.name} · ❤️${h.hp} · ⚔️${h.atk}`;b.onclick=()=>{hero=i;document.querySelectorAll('#choose button').forEach((x,j)=>x.classList.toggle('primary',j===i));hp=h.hp;render();};$('#choose').append(b);});
+function say(t){$('#status').textContent=t;renderStats()}
+function renderStats(){let h=heroes[hero];$('#heroName').textContent=h.name;$('#hp').textContent=`❤️ ${hp}/${h.hp+armor*2}`;$('#gold').textContent=`🪙 ${gold}`;$('#damage').textContent=`⚔️ ${h.atk+upgrade}`;$('#levelTag').textContent=`Этаж ${level}`}
+function makeMap(){tiles=Array.from({length:7},(_,y)=>Array.from({length:7},(_,x)=>(x===0||y===0||x===6||y===6)?1:0)); // random inner obstacles, never block key lanes
+for(let i=0;i<5+Math.min(level,5);i++){let x=1+Math.floor(Math.random()*5),y=1+Math.floor(Math.random()*5);if((x!==player.x||y!==player.y)&&(x!==enemy.x||y!==enemy.y))tiles[y][x]=1;}
+tiles[player.y][player.x]=0;tiles[enemy.y][enemy.x]=0;}
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
+function drawPerson(cx,cy,color,hair,isEnemy=false){let s=7,ox=cx*60,oy=cy*60;
+rect(ox+21,oy+7,18,15,hair);rect(ox+18,oy+19,24,17,isEnemy?'#9ab45a':'#e5b18a');
+rect(ox+22,oy+29,4,4,'#171717');rect(ox+35,oy+29,4,4,'#171717');
+rect(ox+16,oy+36,28,16,color);rect(ox+11,oy+38,7,15,color);rect(ox+42,oy+38,7,15,color);
+rect(ox+18,oy+51,9,8,'#252936');rect(ox+33,oy+51,9,8,'#252936');
+if(isEnemy){rect(ox+12,oy+12,8,10,'#d5d2bd');rect(ox+40,oy+12,8,10,'#d5d2bd');rect(ox+24,oy+40,12,3,'#39252b');}}
+function render(){ctx.clearRect(0,0,420,420);for(let y=0;y<7;y++)for(let x=0;x<7;x++){rect(x*60,y*60,58,58,tiles[y]?.[x]?'#59636a':'#34513a');rect(x*60+2,y*60+2,54,54,tiles[y]?.[x]?'#737d84':'#3d6044');}
+if(enemy.hp>0){drawPerson(enemy.x,enemy.y,'#85a844','#b9d76a',true);ctx.fillStyle='white';ctx.font='12px system-ui';ctx.fillText(''+enemy.hp,enemy.x*60+20,enemy.y*60+5);}
+drawPerson(player.x,player.y,heroes[hero].color,heroes[hero].hair);renderStats();}
+function start(){started=true;$('#selection').classList.add('hidden');player={x:1,y:1};enemy={x:4,y:3,hp:10+(level-1)*4,max:10+(level-1)*4};makeMap();say('Исследуй комнату, найди монстра и победи его!');}
+function move(dx,dy){if(!started||hp<=0)return;let nx=Math.max(1,Math.min(5,player.x+dx)),ny=Math.max(1,Math.min(5,player.y+dy));if(tiles[ny][nx]){say('Здесь стена!');return;}if(enemy.hp>0&&nx===enemy.x&&ny===enemy.y){say('Враг преграждает путь — атакуй!');return;}player={x:nx,y:ny};if(nx===5&&ny===5){gold+=5;localStorage.dqGold=gold;say('Ты нашёл тайник: +5 золота!');}else say('Ты переместился.');render();}
+function hit(mult=1){if(!started||hp<=0||enemy.hp<=0)return;let dist=Math.abs(player.x-enemy.x)+Math.abs(player.y-enemy.y);if(dist>3){say('Подойди ближе к врагу!');return;}let amount=(heroes[hero].atk+upgrade)*mult;enemy.hp=Math.max(0,enemy.hp-amount);if(enemy.hp===0){gold+=15;localStorage.dqGold=gold;say('Монстр побеждён! +15 золота.');}else{hp=Math.max(0,hp-Math.max(1,3-armor));say(`Попадание: ${amount} урона. Враг контратакует!`);}render();}
+$('#start').onclick=start;$('#attack').onclick=()=>hit();$('#skill').onclick=()=>{if(!skillReady){say('Способность ещё восстанавливается.');return;}skillReady=false;hit(3);setTimeout(()=>skillReady=true,2500);};$('#heal').onclick=()=>{if(gold>=8){gold-=8;hp=Math.min(heroes[hero].hp+armor*2,hp+5);say('Ты восстановил 5 здоровья.');}else say('Не хватает золота.');};$('#upgrade').onclick=()=>{if(gold>=10){gold-=10;upgrade++;say('Меч улучшен!');}else say('Не хватает золота.');};$('#armor').onclick=()=>{if(gold>=15){gold-=15;armor++;hp+=2;say('Броня улучшена!');}else say('Не хватает золота.');};$('#next').onclick=()=>{if(enemy.hp>0){say('Сначала победи монстра!');return;}level++;rooms++;start();};
+let pad=$('#movePad'),knob=$('#moveKnob'),active=false,last=0;
+function updatePad(e){let r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,max=43,len=Math.hypot(dx,dy)||1,k=Math.min(1,max/len);knob.style.transform=`translate(${dx*k}px,${dy*k}px)`;let now=Date.now();if(now-last>170&&(Math.abs(dx)>13||Math.abs(dy)>13)){let mx=Math.abs(dx)>Math.abs(dy)?Math.sign(dx):0,my=Math.abs(dy)>=Math.abs(dx)?Math.sign(dy):0;move(mx,my);last=now;}}
+pad.addEventListener('pointerdown',e=>{active=true;pad.setPointerCapture(e.pointerId);updatePad(e)});pad.addEventListener('pointermove',e=>{if(active)updatePad(e)});function end(){active=false;knob.style.transform='translate(0,0)'}pad.addEventListener('pointerup',end);pad.addEventListener('pointercancel',end);
+renderStats();makeMap();render();
+</script></body></html>
